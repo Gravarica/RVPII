@@ -1,0 +1,87 @@
+---
+title: "Analiza policijskih akcija na teritoriji grada Sijetla"
+author: "Miloš Gravara"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Skup podataka o policijskim akcijama na teritoriji grada Sijetla
+
+Ovaj skup podataka sadrži informacije o pozivima policiji i odgovarajućim policijskim akcijama u Sijetlu. Kolone u skupu podataka su sledeće:
+1. **CAD.Event.Number** - Jedinstveni identifikacioni broj događaja. 
+2. **Event.Clearance.Description** - Policijski kako je događaj završen.
+3. **Call.Type** - Tip poziva sa 10 različitih vrednosti (911, Alarm, Onview...)
+4. **Priority** - Prioritet poziva sa vrednostima od 1 (najmanjeg prioriteta) do 9 (najvišeg)
+5. **Initial.Call.Type** - Prvobitna klasifikacija poziva od strane primaoca poziva u 911 centru, sa 325 različitih vrednosti 
+6. **Final.Call.Type** - Konačna klasifikacija poziva od strane policijskog službenika nakon pregleda, sa 431 različitom vrednošću
+7. **Original.Time.Queued** - Vreme kada je poziv zabeležen
+8. **Arrived.Time** - Vreme kada je policija stigla na lice mesta. 
+9. **Precinct** - Policijska stanica u Sijetlu 
+10. **Sector** - Policijski sektor 
+11. **Beat** - Teritorija i vreme tokom kojeg policijski službenih patrolira 
+12. **Blurred_Longitude** - Zamaskirana geografska dužina događaja
+13. **Blurred_Latitude** - Zamaskirana geografska širina događaja
+
+Ovaj skup podataka pruža detaljne informacije o svim pozivima koje je primila policija, uključujući tipove poziva, prioritete, vremena poziva i dolaska policije, kao i geografske lokacije događaja (zamaskirane). Takođe uključuje početnu i konačnu klasifikaciju svakog poziva, što omogućava analizu kako se incidenti klasifikuju i rešavaju.
+
+Pored toga bitno je napomenuti sledeću činjenicu u kontekstu analize sledećeg skupa podataka:
+Zamaskirana (ili zamagljena) geografska širina i dužina u ovom kontekstu znači da su stvarne koordinate događaja namerno modifikovane kako bi se zaštitila privatnost uključenih osoba i tačna lokacija događaja. Ovaj proces se obično primenjuje kako bi se sprečilo da se iz podataka izvede tačna adresa ili lokacija, čime se štiti privatnost i bezbednost građana. Dakle, zamaskirane koordinate neće precizno odgovarati stvarnom mestu događaja, već će biti pomerene ili prilagođene na način koji sprečava identifikaciju specifične lokacije. Svakako, ove koordinate, iako neprecizne, odgovaraju teritoriji grada Sijetla, te mogu poslužiti za potrebe klasifikacije i klasterizacije podataka. 
+
+### Instalacija neophodnih paketa
+``` {r eval=T, results = 'hide', include = FALSE}
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("knitr")
+install.packages("ggmap")
+install.packages("sparklyr")
+```
+### Ucitavanje i priprema neophodnih biblioteka
+``` {r eval=T, results='hide', include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(ggmap)
+library(sparklyr)
+
+#spark_install(version = "3.3")
+sc <- spark_connect(master = "local", 
+                    config = list(spark.driver.memory = "5G", 
+                                  spark.executor.memory = "5G"))
+```
+### Ucitavanje podataka
+
+S obzirom na veličinu skupa podataka (1.1GB), podaci se učitavaju i dalje transformišu uz pomoć Apache Spark alata.
+
+``` {r eval = T, results = 'hold'}
+df <- spark_read_csv(sc, name = "police_calls", path = "Call_Data.csv", header = TRUE, infer_schema = TRUE)
+```
+
+### Priprema podataka za analizu
+
+Kako bi se mogla vršiti adekvatna analiza podataka neophodno je uraditi nekoliko transformacija na početnom skupu podataka: 
+
+* Izbacivanje svih nepostojećih vrednosti iz skupa 
+
+``` {r eval=T, results='hold'}
+df_clean <- df %>% na.omit()
+```
+* Pravljenjem histograma za lokacijske podatke, može se primetiti da postoji određeni broj događaja koji imaju pogrešno specificiranu geografsku širinu ili dužinu. Naredni isečak koda prikazuje raspodele vrednosti geografske širine i dužine, kao i sređivanje tih vrednosti kako bi odgovarale koordinatama grada Sijetla. 
+
+``` {r eval=T, results='hold'}
+ggplot(data = df_clean, aes(x = Blurred_Longitude)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Histogram geografske širine",
+       x = "Geografksa širina",
+       y = "Frekvencija")
+```
+
+``` {r eval=T, results='hold'}
+ggplot(data = df_clean, aes(x = Blurred_Latitude)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Histogram geografske dužine",
+       x = "Geografksa dužina",
+       y = "Frekvencija")
+```
