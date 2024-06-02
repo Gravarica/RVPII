@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
 ```
 ### Skup podataka o policijskim akcijama na teritoriji grada Sijetla
 
@@ -46,7 +46,7 @@ library(knitr)
 library(ggmap)
 library(sparklyr)
 
-#spark_install(version = "3.3")
+spark_install(version = "3.5")
 sc <- spark_connect(master = "local", 
                     config = list(spark.driver.memory = "5G", 
                                   spark.executor.memory = "5G"))
@@ -85,3 +85,8 @@ ggplot(data = df_clean, aes(x = Blurred_Latitude)) +
        x = "Geografksa dužina",
        y = "Frekvencija")
 ```
+
+```{r image}
+include_graphics(c("Slike/Longitude.png", "Slike/Latitude.png"))
+```
+
