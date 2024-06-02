@@ -51,4 +51,4 @@ po/*~
 rsconnect/
 
 #logs for spark 
-/logs
+logs/
