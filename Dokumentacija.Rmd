@@ -22,13 +22,10 @@ Ovaj skup podataka sadrži informacije o pozivima policiji i odgovarajućim poli
 9. **Precinct** - Policijska stanica u Sijetlu 
 10. **Sector** - Policijski sektor 
 11. **Beat** - Teritorija i vreme tokom kojeg policijski službenih patrolira 
-12. **Blurred_Longitude** - Zamaskirana geografska dužina događaja
-13. **Blurred_Latitude** - Zamaskirana geografska širina događaja
+12. **Blurred_Longitude** - Geografska dužina događaja
+13. **Blurred_Latitude** - Geografska širina događaja
 
 Ovaj skup podataka pruža detaljne informacije o svim pozivima koje je primila policija, uključujući tipove poziva, prioritete, vremena poziva i dolaska policije, kao i geografske lokacije događaja (zamaskirane). Takođe uključuje početnu i konačnu klasifikaciju svakog poziva, što omogućava analizu kako se incidenti klasifikuju i rešavaju.
-
-Pored toga bitno je napomenuti sledeću činjenicu u kontekstu analize sledećeg skupa podataka:
-Zamaskirana (ili zamagljena) geografska širina i dužina u ovom kontekstu znači da su stvarne koordinate događaja namerno modifikovane kako bi se zaštitila privatnost uključenih osoba i tačna lokacija događaja. Ovaj proces se obično primenjuje kako bi se sprečilo da se iz podataka izvede tačna adresa ili lokacija, čime se štiti privatnost i bezbednost građana. Dakle, zamaskirane koordinate neće precizno odgovarati stvarnom mestu događaja, već će biti pomerene ili prilagođene na način koji sprečava identifikaciju specifične lokacije. Svakako, ove koordinate, iako neprecizne, odgovaraju teritoriji grada Sijetla, te mogu poslužiti za potrebe klasifikacije i klasterizacije podataka. 
 
 ### Instalacija neophodnih paketa
 ``` {r eval=T, results = 'hide', include = FALSE}
@@ -46,10 +43,14 @@ library(knitr)
 library(ggmap)
 library(sparklyr)
 
-spark_install(version = "3.5")
+#spark_install(version = "3.5")
+conf <- spark_config()
+conf$`sparklyr.shell.driver-memory` <- "16G"
+conf$spark.memory.fraction <- 0.9
+
 sc <- spark_connect(master = "local", 
-                    config = list(spark.driver.memory = "5G", 
-                                  spark.executor.memory = "5G"))
+                    version = "3.5",
+                    config = conf)
 ```
 ### Ucitavanje podataka
 
@@ -89,4 +90,130 @@ ggplot(data = df_clean, aes(x = Blurred_Latitude)) +
 ```{r image}
 include_graphics(c("Slike/Longitude.png", "Slike/Latitude.png"))
 ```
+* Moze se primetiti na histogramima da postoji odredjeni broj entiteta koji imaju pogresno unete koordinate geografske sirine i duzine. S obzirom na to da ne postoji prevelik broj ovakvih entiteta, oni se mogu izbaciti iz skupa podataka. To se moze uraditi na sledeci nacin:
 
+``` {r}
+df_clean_ll <- df_clean %>% filter(Blurred_Latitude >= 47 & Blurred_Latitude <= 48 & Blurred_Longitude >= -123 & Blurred_Longitude <= -122)
+```
+
+* Histogrami raspodele geografske sirine i duzine za ociscene vrednosti
+
+``` {r}
+ggplot(data = df_clean_ll, aes(x = Blurred_Longitude)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Histogram geografske širine",
+       x = "Geografksa širina",
+       y = "Frekvencija")
+```
+
+``` {r}
+ggplot(data = df_clean_ll, aes(x = Blurred_Longitude)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Histogram geografske širine",
+       x = "Geografksa širina",
+       y = "Frekvencija")
+```
+
+* Raspodela ovih vrednosti se moze prikazati i na mapi, uz upotrebu **ggmap** biblioteke i stadiamaps API kljuca, sto prikazuje sledeci isecak koda:
+
+``` {r}
+# Postavljanje vrednosti API kljuca
+register_stadiamaps("04c1350e-f51f-4265-b458-ad6b6a3192bb", write = TRUE)
+# Kreiranje mape Sijetla
+seattle <- c(left = -122.45, bottom = 47.48, right = -122.2, top = 47.73)
+seattle_map <- get_stadiamap(seattle, zoom = 15)
+# Plotovanje mape
+ggmap(seattle_map) +
+ geom_point(data = df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude,  color = Final_Call_Type))
+ labs(title = "Seattle Crime Map",
+      x = "Longitude",
+      y = "Latitude",
+ color = "Final Call Type")
+ 
+```
+
+``` {r}
+include_graphics("Slike/PointsOnTheMap.png")
+```
+* Sledeca stvar koja se mora uzeti u obzir jesu inicijalne i finalne kategorije poziva predstavljene kolonama Initial_Call_Type i Final_Call_Type. S obzirom na to da Initial_Call_Type sadrzi 325 razlicitih kategorija, a Final_Call_Type 431 razlicitu kategoriju, ideja je da se ove kategorije grupisu u natkategorije kako bi se podaci lakse analizirali i vizualizovali. Sledeci isecak koda prikazuje funkciju `map_call_types` kojom se vrsi grupisanje ovih kategorija: 
+
+* Primenom ove funkcije na skup podataka se vrsi kreiranje agregacija kategorija: 
+
+``` {r}
+df_clean_ll <- df_clean_ll %>%
+  mutate(Initial_Category = case_when(
+    grepl("ASLT|Assault|ASSAULT|ASSAULTS|HARRASMENT|THREAT|THREATS|WEAPON|GUN|PANHANDLING|HARASSMENT|VIOLENT", Initial_Call_Type) ~ "Assaults and Threats",
+    grepl("TRAFFICING|SEX|RAPE|PORNOGRAPHY|PROSTITUTION|LEWD|PROWLER", Initial_Call_Type) ~ "Sex Offenses",
+    grepl("NARCOTICS|DRUGS|MARIJUANA|OVERDOSE|OD|LIQUOR|DETOX|INTOX|LIQ", Initial_Call_Type) ~ "Narcotics",
+    grepl("ROBBERY|BURGLARY|PROPERTY|THEFT|BREAKING|SHOPLIFT|ARSON|TRESPASS|BURG|BURN|EXPLOSION|FRAUD", Initial_Call_Type) ~ "Property Crimes",
+    grepl("ALARM|ORDER|INSPECTION|WATCH", Initial_Call_Type) ~ "Alarm and Security",
+    grepl("ASSIST|CHECK|HELP|ASSIGNED|PATROL", Initial_Call_Type) ~ "Assistance and Checks",
+    grepl("DOMESTIC|ABUSE|CUSTODIAL|ARGUMENTS|DV", Initial_Call_Type) ~ "Domestic Violence",
+    grepl("Traffic|VIOLATIONS|ACCIDENT|MVC|CAR|DUI|TRAF|ROAD|VEHICLE|DUI|ACC|HIT AND RUN|", Initial_Call_Type) ~ "Traffic Incident",
+    grepl("MISSING|AWOL|FOUND|RUNAWAY|ABDUCTION|KIDNAP|CHILD|JUVENILE|LOST|AMBER|A.W.O.L.", Initial_Call_Type) ~ "Missing Persons",
+    grepl("HARBOR|ANIMAL|GAMBLING|WATER|TREES|NORAD|STADIUM|ILLEGAL DUMPING|SLEEPER|HAZ|BIAS|NUISANCE|URINATING|HOSPITAL|PHONE|CROWD|EVENT|DEMONSTRATIONS|DISTURBANCE|UNUSUAL|NOISE|POWER|LANDLINE|LITTERING", Initial_Call_Type) ~ "Civil incidents and security",
+    grepl("DOA|SHOTS|CASUALTY|FELONY|SUSPICIOUS|ESCAPE|FIRE|PURSUIT|SWAT|SHOOTING|SUICIDE|HOSTAGE|HOMICIDE", Initial_Call_Type) ~ "Emergency and Critical incidents",
+    grepl("OBS", Initial_Call_Type) ~ "Observation",
+    grepl("CANCELLED|NO ANSWER|OUT AT RANGE", Initial_Call_Type) ~ "No action",
+    TRUE ~ "Other"
+  ))
+```
+
+* Primena i na Final Call Type: 
+
+``` {r}
+df_clean_ll <- df_clean_ll %>%
+  mutate(Final_Category = case_when(
+    grepl("ASLT|Assault|ASSAULT|ASSAULTS|HARRASMENT|THREAT|THREATS|WEAPON|GUN|PANHANDLING|HARASSMENT|VIOLENT", Final_Call_Type) ~ "Assaults and Threats",
+    grepl("TRAFFICING|SEX|RAPE|PORNOGRAPHY|PROSTITUTION|LEWD|PROWLER", Final_Call_Type) ~ "Sex Offenses",
+    grepl("NARCOTICS|DRUGS|MARIJUANA|OVERDOSE|OD|LIQUOR|DETOX|INTOX|LIQ", Final_Call_Type) ~ "Narcotics",
+    grepl("ROBBERY|BURGLARY|PROPERTY|THEFT|BREAKING|SHOPLIFT|ARSON|TRESPASS|BURG|BURN|EXPLOSION|FRAUD", Final_Call_Type) ~ "Property Crimes",
+    grepl("ALARM|ORDER|INSPECTION|WATCH", Final_Call_Type) ~ "Alarm and Security",
+    grepl("ASSIST|CHECK|HELP|ASSIGNED|PATROL", Final_Call_Type) ~ "Assistance and Checks",
+    grepl("DOMESTIC|ABUSE|CUSTODIAL|ARGUMENTS|DV", Final_Call_Type) ~ "Domestic Violence",
+    grepl("Traffic|VIOLATIONS|ACCIDENT|MVC|CAR|DUI|TRAF|ROAD|VEHICLE|DUI|ACC|HIT AND RUN|", Final_Call_Type) ~ "Traffic Incident",
+    grepl("MISSING|AWOL|FOUND|RUNAWAY|ABDUCTION|KIDNAP|CHILD|JUVENILE|LOST|AMBER|A.W.O.L.", Final_Call_Type) ~ "Missing Persons",
+    grepl("HARBOR|ANIMAL|GAMBLING|WATER|TREES|NORAD|STADIUM|ILLEGAL DUMPING|SLEEPER|HAZ|BIAS|NUISANCE|URINATING|HOSPITAL|PHONE|CROWD|EVENT|DEMONSTRATIONS|DISTURBANCE|UNUSUAL|NOISE|POWER|LANDLINE|LITTERING", Final_Call_Type) ~ "Civil incidents and security",
+    grepl("DOA|SHOTS|CASUALTY|FELONY|SUSPICIOUS|ESCAPE|FIRE|PURSUIT|SWAT|SHOOTING|SUICIDE|HOSTAGE|HOMICIDE", Final_Call_Type) ~ "Emergency and Critical incidents",
+    grepl("OBS", Final_Call_Type) ~ "Observation",
+    grepl("CANCELLED|NO ANSWER|OUT AT RANGE", Final_Call_Type) ~ "No action",
+    TRUE ~ "Other"
+  ))
+```
+
+* S obzirom na to da je moguce da se desi da inicijalna kategorizacija od strane 911 operatera ne odgovara finalnoj kategorizaciji dogadjaja od strane policajca, sledeci dijagram prikazuje slucajeve raspodelu slucajeva kada je finalna kategorizacija odgovarala incijalnoj i obrnuto: 
+
+``` {r}
+same_diff_counts <- df_clean_ll %>%
+  group_by(Same_Category = ifelse(Initial_Category == Final_Category, "Ista", "Razlicita")) %>%
+  summarise(Count = n())
+
+# Stubicasti dijagram za prikaz vrednosti
+ggplot(same_diff_counts, aes(x = Same_Category, y = Count, fill = Same_Category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Poredjenje inicijalne i finalne kategorije",
+       x = "Kategorija",
+       y = "Broj pojava",
+       fill = "Category")
+```
+
+* Jedna od mogucnosti za klasifikaciju jeste procena brzine policijske reakcije na osnovu prijavljenog dogadjaja. S obzirom na to da mnogi faktori mogu da uticu na brzinu reakcije, poput geografske lokacije, sektora policijske stanice, kategorije poziva, aktivne jedinice patroliranja, prioriteta i inicijalnog vremena, moguce je na osnovu obelezja Arrival.Time, labelirati podatke na osnovu da li je reakcija bila brza ili nije, pa vrsiti binarnu klasifikaciju. Kako bi se moglo utvrditi sta je brza reakcija, a sta ne, najpre ce se skicirati histogram petominutnih intervala kako bi se uvidela raspodela pojava. 
+
+* Racunanje vremena odziva na dogadjaj: 
+``` {r}
+  df_times <- df_clean_ll %>%
+  mutate(Response_Time = (unix_timestamp(Arrived_Time) - unix_timestamp(Original_Time_Queued)) / 60)
+```
+
+* Plotovanje histograma kako bi se uvidela raspodela vremena odziva: 
+``` {r}
+df_collected <- df_times %>% sdf_collect()
+
+# Plot histogram with 5-minute bins
+ggplot(df_collected, aes(x = Response_Time)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Response Times",
+       x = "Response Time (minutes)",
+       y = "Frequency") +
+  scale_x_continuous(breaks = seq(0, max(df_collected$Response_Time, na.rm = TRUE), by = 5))
+```
