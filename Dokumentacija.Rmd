@@ -57,7 +57,23 @@ sc <- spark_connect(master = "local",
 S obzirom na veličinu skupa podataka (1.1GB), podaci se učitavaju i dalje transformišu uz pomoć Apache Spark alata.
 
 ``` {r eval = T, results = 'hold'}
-df <- spark_read_csv(sc, name = "police_calls", path = "Call_Data.csv", header = TRUE, infer_schema = TRUE)
+schema <- list(
+  CAD.Event.Number = "character",
+  Event.Clearance.Description = "character",
+  Call.Type = "character",
+  Priority = "character",
+  Initial.Call.Type = "character",
+  Final.Call.Type = "character",
+  Original.Time.Queued = "character",
+  Arrived.Time = "character",
+  Precinct = "character",
+  Sector = "character",
+  Beat = "character",
+  Blurred_Longitude = "character",
+  Blurred_Latitude = "character"
+)
+
+df <- spark_read_csv(sc, name = "police_calls", path = "Call_Data.csv", header = TRUE, columns = schema)
 ```
 
 ### Priprema podataka za analizu
@@ -69,6 +85,30 @@ Kako bi se mogla vršiti adekvatna analiza podataka neophodno je uraditi nekolik
 ``` {r eval=T, results='hold'}
 df_clean <- df %>% na.omit()
 ```
+
+``` {r}
+df_clean %>% summarise(
+  min_original_time = min(Original_Time_Queued, na.rm = TRUE),
+  max_original_time = max(Original_Time_Queued, na.rm = TRUE),
+  min_arrived_time = min(Arrived_Time, na.rm = TRUE),
+  max_arrived_time = max(Arrived_Time, na.rm = TRUE)
+) %>% collect()
+```
+
+``` {r eval = T, results='hold'}
+df_clean <- df_clean %>%
+  mutate(
+    Original_Time_Queued = to_timestamp(Original_Time_Queued, "MM/dd/yyyy hh:mm:ss a"),
+    Arrived_Time = to_timestamp(Arrived_Time, "MM/dd/yyyy hh:mm:ss a")
+  )
+```
+
+
+``` {r}
+df_clean <- df_clean %>%
+  filter(!is.na(Original_Time_Queued) & !is.na(Arrived_Time) & Original_Time_Queued < Arrived_Time)
+```
+
 * Pravljenjem histograma za lokacijske podatke, može se primetiti da postoji određeni broj događaja koji imaju pogrešno specificiranu geografsku širinu ili dužinu. Naredni isečak koda prikazuje raspodele vrednosti geografske širine i dužine, kao i sređivanje tih vrednosti kako bi odgovarale koordinatama grada Sijetla. 
 
 ``` {r eval=T, results='hold'}
@@ -201,19 +241,21 @@ ggplot(same_diff_counts, aes(x = Same_Category, y = Count, fill = Same_Category)
 
 * Racunanje vremena odziva na dogadjaj: 
 ``` {r}
-  df_times <- df_clean_ll %>%
-  mutate(Response_Time = (unix_timestamp(Arrived_Time) - unix_timestamp(Original_Time_Queued)) / 60)
+df_times <- df_clean_ll %>%
+  mutate(
+    Response_Time = (unix_timestamp(Arrived_Time) - unix_timestamp(Original_Time_Queued)) / 60
+  )
+
 ```
 
 * Plotovanje histograma kako bi se uvidela raspodela vremena odziva: 
 ``` {r}
-df_collected <- df_times %>% sdf_collect()
-
 # Plot histogram with 5-minute bins
-ggplot(df_collected, aes(x = Response_Time)) +
-  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+df_times <- df_times %>% filter(Response_Time >= 0 & Response_Time <= 1000)
+
+ggplot(df_times, aes(x = Response_Time)) +
+  geom_histogram(binwidth = 10, fill = "skyblue", color = "black") +
   labs(title = "Distribution of Response Times",
        x = "Response Time (minutes)",
-       y = "Frequency") +
-  scale_x_continuous(breaks = seq(0, max(df_collected$Response_Time, na.rm = TRUE), by = 5))
+       y = "Frequency")
 ```
