@@ -69,8 +69,8 @@ schema <- list(
   Precinct = "character",
   Sector = "character",
   Beat = "character",
-  Blurred_Longitude = "character",
-  Blurred_Latitude = "character"
+  Blurred_Longitude = "numeric",
+  Blurred_Latitude = "numeric"
 )
 
 df <- spark_read_csv(sc, name = "police_calls", path = "Call_Data.csv", header = TRUE, columns = schema)
@@ -161,7 +161,7 @@ ggplot(data = df_clean_ll, aes(x = Blurred_Longitude)) +
 register_stadiamaps("04c1350e-f51f-4265-b458-ad6b6a3192bb", write = TRUE)
 # Kreiranje mape Sijetla
 seattle <- c(left = -122.45, bottom = 47.48, right = -122.2, top = 47.73)
-seattle_map <- get_stadiamap(seattle, zoom = 15)
+seattle_map <- get_stadiamap(seattle, zoom = 18)
 # Plotovanje mape
 ggmap(seattle_map) +
  geom_point(data = df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude,  color = Final_Call_Type))
@@ -185,14 +185,14 @@ df_clean_ll <- df_clean_ll %>%
     grepl("ASLT|Assault|ASSAULT|ASSAULTS|HARRASMENT|THREAT|THREATS|WEAPON|GUN|PANHANDLING|HARASSMENT|VIOLENT", Initial_Call_Type) ~ "Assaults and Threats",
     grepl("TRAFFICING|SEX|RAPE|PORNOGRAPHY|PROSTITUTION|LEWD|PROWLER", Initial_Call_Type) ~ "Sex Offenses",
     grepl("NARCOTICS|DRUGS|MARIJUANA|OVERDOSE|OD|LIQUOR|DETOX|INTOX|LIQ", Initial_Call_Type) ~ "Narcotics",
+    grepl("HARBOR|ANIMAL|GAMBLING|WATER|TREES|NORAD|STADIUM|ILLEGAL DUMPING|SLEEPER|HAZ|BIAS|NUISANCE|URINATING|HOSPITAL|PHONE|CROWD|EVENT|DEMONSTRATIONS|DISTURBANCE|UNUSUAL|NOISE|POWER|LANDLINE|LITTERING", Initial_Call_Type) ~ "Civil incidents and security",
+    grepl("DOA|SHOTS|CASUALTY|FELONY|SUSPICIOUS|ESCAPE|FIRE|PURSUIT|SWAT|SHOOTING|SUICIDE|HOSTAGE|HOMICIDE", Initial_Call_Type) ~ "Emergency and Critical incidents",
     grepl("ROBBERY|BURGLARY|PROPERTY|THEFT|BREAKING|SHOPLIFT|ARSON|TRESPASS|BURG|BURN|EXPLOSION|FRAUD", Initial_Call_Type) ~ "Property Crimes",
     grepl("ALARM|ORDER|INSPECTION|WATCH", Initial_Call_Type) ~ "Alarm and Security",
     grepl("ASSIST|CHECK|HELP|ASSIGNED|PATROL", Initial_Call_Type) ~ "Assistance and Checks",
     grepl("DOMESTIC|ABUSE|CUSTODIAL|ARGUMENTS|DV", Initial_Call_Type) ~ "Domestic Violence",
     grepl("Traffic|VIOLATIONS|ACCIDENT|MVC|CAR|DUI|TRAF|ROAD|VEHICLE|DUI|ACC|HIT AND RUN|", Initial_Call_Type) ~ "Traffic Incident",
     grepl("MISSING|AWOL|FOUND|RUNAWAY|ABDUCTION|KIDNAP|CHILD|JUVENILE|LOST|AMBER|A.W.O.L.", Initial_Call_Type) ~ "Missing Persons",
-    grepl("HARBOR|ANIMAL|GAMBLING|WATER|TREES|NORAD|STADIUM|ILLEGAL DUMPING|SLEEPER|HAZ|BIAS|NUISANCE|URINATING|HOSPITAL|PHONE|CROWD|EVENT|DEMONSTRATIONS|DISTURBANCE|UNUSUAL|NOISE|POWER|LANDLINE|LITTERING", Initial_Call_Type) ~ "Civil incidents and security",
-    grepl("DOA|SHOTS|CASUALTY|FELONY|SUSPICIOUS|ESCAPE|FIRE|PURSUIT|SWAT|SHOOTING|SUICIDE|HOSTAGE|HOMICIDE", Initial_Call_Type) ~ "Emergency and Critical incidents",
     grepl("OBS", Initial_Call_Type) ~ "Observation",
     grepl("CANCELLED|NO ANSWER|OUT AT RANGE", Initial_Call_Type) ~ "No action",
     TRUE ~ "Other"
@@ -207,14 +207,14 @@ df_clean_ll <- df_clean_ll %>%
     grepl("ASLT|Assault|ASSAULT|ASSAULTS|HARRASMENT|THREAT|THREATS|WEAPON|GUN|PANHANDLING|HARASSMENT|VIOLENT", Final_Call_Type) ~ "Assaults and Threats",
     grepl("TRAFFICING|SEX|RAPE|PORNOGRAPHY|PROSTITUTION|LEWD|PROWLER", Final_Call_Type) ~ "Sex Offenses",
     grepl("NARCOTICS|DRUGS|MARIJUANA|OVERDOSE|OD|LIQUOR|DETOX|INTOX|LIQ", Final_Call_Type) ~ "Narcotics",
+    grepl("HARBOR|ANIMAL|GAMBLING|WATER|TREES|NORAD|STADIUM|ILLEGAL DUMPING|SLEEPER|HAZ|BIAS|NUISANCE|URINATING|HOSPITAL|PHONE|CROWD|EVENT|DEMONSTRATIONS|DISTURBANCE|UNUSUAL|NOISE|POWER|LANDLINE|LITTERING", Final_Call_Type) ~ "Civil incidents and security",
+    grepl("DOA|SHOTS|CASUALTY|FELONY|SUSPICIOUS|ESCAPE|FIRE|PURSUIT|SWAT|SHOOTING|SUICIDE|HOSTAGE|HOMICIDE", Final_Call_Type) ~ "Emergency and Critical incidents",
     grepl("ROBBERY|BURGLARY|PROPERTY|THEFT|BREAKING|SHOPLIFT|ARSON|TRESPASS|BURG|BURN|EXPLOSION|FRAUD", Final_Call_Type) ~ "Property Crimes",
     grepl("ALARM|ORDER|INSPECTION|WATCH", Final_Call_Type) ~ "Alarm and Security",
     grepl("ASSIST|CHECK|HELP|ASSIGNED|PATROL", Final_Call_Type) ~ "Assistance and Checks",
     grepl("DOMESTIC|ABUSE|CUSTODIAL|ARGUMENTS|DV", Final_Call_Type) ~ "Domestic Violence",
     grepl("Traffic|VIOLATIONS|ACCIDENT|MVC|CAR|DUI|TRAF|ROAD|VEHICLE|DUI|ACC|HIT AND RUN|", Final_Call_Type) ~ "Traffic Incident",
     grepl("MISSING|AWOL|FOUND|RUNAWAY|ABDUCTION|KIDNAP|CHILD|JUVENILE|LOST|AMBER|A.W.O.L.", Final_Call_Type) ~ "Missing Persons",
-    grepl("HARBOR|ANIMAL|GAMBLING|WATER|TREES|NORAD|STADIUM|ILLEGAL DUMPING|SLEEPER|HAZ|BIAS|NUISANCE|URINATING|HOSPITAL|PHONE|CROWD|EVENT|DEMONSTRATIONS|DISTURBANCE|UNUSUAL|NOISE|POWER|LANDLINE|LITTERING", Final_Call_Type) ~ "Civil incidents and security",
-    grepl("DOA|SHOTS|CASUALTY|FELONY|SUSPICIOUS|ESCAPE|FIRE|PURSUIT|SWAT|SHOOTING|SUICIDE|HOSTAGE|HOMICIDE", Final_Call_Type) ~ "Emergency and Critical incidents",
     grepl("OBS", Final_Call_Type) ~ "Observation",
     grepl("CANCELLED|NO ANSWER|OUT AT RANGE", Final_Call_Type) ~ "No action",
     TRUE ~ "Other"
@@ -235,6 +235,20 @@ ggplot(same_diff_counts, aes(x = Same_Category, y = Count, fill = Same_Category)
        x = "Kategorija",
        y = "Broj pojava",
        fill = "Category")
+```
+* Raspodela finalnih kategorizacija je prikazana na narednom stubicastom dijagramu: 
+
+``` {r}
+final_category_counts <- df_clean_ll %>%
+  group_by(Final_Category) %>%
+  summarise(Count = n())
+
+ggplot(final_category_counts, aes(x = reorder(Final_Category, -Count), y = Count, fill = Final_Category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Raspodela finalnih kategorizacija",
+       x = "Finalna Kategorija",
+       y = "Broj pojava") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
 * Jedna od mogucnosti za klasifikaciju jeste procena brzine policijske reakcije na osnovu prijavljenog dogadjaja. S obzirom na to da mnogi faktori mogu da uticu na brzinu reakcije, poput geografske lokacije, sektora policijske stanice, kategorije poziva, aktivne jedinice patroliranja, prioriteta i inicijalnog vremena, moguce je na osnovu obelezja Arrival.Time, labelirati podatke na osnovu da li je reakcija bila brza ili nije, pa vrsiti binarnu klasifikaciju. Kako bi se moglo utvrditi sta je brza reakcija, a sta ne, najpre ce se skicirati histogram petominutnih intervala kako bi se uvidela raspodela pojava. 
@@ -259,3 +273,248 @@ ggplot(df_times, aes(x = Response_Time)) +
        x = "Response Time (minutes)",
        y = "Frequency")
 ```
+
+* Kako bi se izvrsila binarna klasifikacija, kreirano je novo obelezje (labela) `Response_Speed` koje ima vrednosti 'Fast' i 'Slow'. Vrednosti ovog obelezja se dodeljuju na osnovu medijalne vrednosti vremena odziva - `Response_Time`. Sve pojave koje imaju vreme odziva manje od medijalne ce imati vrednost labele `Response_Speed` - 'Fast', dok ce ostale pojave imati vrednost - 'Slow'. Sledeci kod prikazuje kreiranje ovog obelezja u skupu podataka: 
+
+``` {r}
+#dft <- df_times %>% collect()
+median_value <- median(dft$Response_Time)
+df_prepared <- df_times %>%
+  mutate(Response_Speed = if_else(Response_Time <= median_value, 1, 0))
+```
+
+* Prikaz raspodele brzine odziva
+
+``` {r}
+response_speeds <- df_prepared %>%
+  group_by(Response_Speed) %>%
+  summarise(Count = n())
+
+ggplot(response_speeds, aes(x = Response_Speed, y = Count, fill = Response_Speed)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Raspodela brzina odziva",
+       x = "Brzina odziva",
+       y = "Broj pojava",
+       fill = "Response_Speed")
+```
+
+* Prikaz kako razlicita obelezja uticu na Response_Time: 
+
+``` {r}
+ggplot(df_prepared, aes(x = Priority, y = Response_Time)) +
+  geom_boxplot() +
+  labs(title = "Response Time vs. Priority", x = "Priority", y = "Response Time")
+
+ggplot(df_prepared, aes(x = Initial_Category, y = Response_Time)) +
+  geom_boxplot() +
+  labs(title = "Response Time vs. Initial Category", x = "Initial Category", y = "Response Time") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Response_Speed)) +
+  geom_point() +
+  labs(title = "Response Speed vs. Location", x = "Longitude", y = "Latitude", color = "Response Time")
+
+ggplot(df_prepared, aes(x = Sector, y = Response_Time)) +
+  geom_boxplot() +
+  labs(title = "Response Time vs. Sector", x = "Sector", y = "Response Time") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+* Priprema skupa podataka za treniranje klasifikacionih modela
+
+``` {r }
+df_prepared_split <- df_prepared %>%
+  select(Response_Time, Response_Speed, Sector, Precinct, Initial_Category, Blurred_Longitude, Blurred_Latitude, Priority) %>%
+  sdf_random_split(training = 0.8,
+                   test = 0.2,
+                   seed = 100)
+```
+
+* Kreiranje razlicitih klasifikacionih modela sa razlicitim hiperparametrima:
+
+``` {r}
+# Logistic Regression
+log_pipeline <- sc %>% 
+  ml_pipeline() %>%
+  ft_r_formula(Response_Speed ~ .) %>%
+  ml_logistic_regression()
+
+param_grid <- list(
+  logistic_regression = list(reg_param = c(0.01, 0.1, 1))
+)
+
+lr_evaluator <- ml_binary_classification_evaluator(x = sc, metricName = "areaUnderROC")
+
+# Kros-validacija
+logistic_cv <- ml_cross_validator(
+  x = sc, 
+  estimator = log_pipeline,
+  estimator_param_maps = param_grid,
+  evaluator = lr_evaluator,
+  num_folds = 5
+)
+
+print(logistic_cv)
+
+model_cv <- ml_fit(
+  x = logistic_cv,
+  dataset = df_prepared_split$training
+)
+
+cv_metrics <- ml_validation_metrics(model_cv)
+
+cv_metrics %>% 
+  ggplot(aes(reg_param_1, areaUnderROC)) + 
+  geom_line() + 
+  geom_smooth()
+```
+
+``` {r}
+# Na osnovu grafa se utvrdjuje da je model sa parametrom regularizacije 0.01 najbolji
+lmodel <- ml_logistic_regression(
+  df_prepared_split$training,
+  Response_Speed ~ .,
+  reg_param = 0.01
+)
+
+lrmx <- lmodel %>% 
+  ml_predict(df_prepared_split$test) %>% 
+  ml_metrics_binary()
+```
+
+``` {r}
+# Random Forest
+rf_pipeline <- sc %>% 
+  ml_pipeline() %>%
+  ft_r_formula(Response_Speed ~ .) %>%
+  ml_random_forest_classifier()
+
+rf_grid <- list(
+  random_forest_classifier = list(  
+    num_trees = c(10, 30, 50)
+  )
+)
+
+rf_evaluator = ml_binary_classification_evaluator(x = sc, metricName = "areaUnderROC")
+
+# Kros-validacija
+rf_cv <- ml_cross_validator(
+  x = sc, 
+  estimator = rf_pipeline,
+  estimator_param_maps = rf_grid,
+  evaluator = rf_evaluator, 
+  num_folds = 5
+)
+
+model_rf_cv <- ml_fit(
+  x = rf_cv,
+  dataset = df_prepared_split$training
+)
+
+rf_cv_metrics <- ml_validation_metrics(model_rf_cv)
+
+rf_cv_metrics %>% 
+  ggplot(aes(num_trees_1, areaUnderROC)) + 
+  geom_line() + 
+  geom_smooth()
+```
+
+``` {r}
+# Izbor najboljeg modela
+
+rfmodel <- ml_random_forest_classifier(
+  df_prepared_split$training,
+  Response_Speed ~ .,
+  num_trees = 50
+)
+
+rfmx <- rfmodel %>% 
+  ml_predict(df_prepared_split$test) %>% 
+  ml_metrics_binary()
+```
+
+``` {r}
+# Gradient Boosting
+dt_pipeline <- sc %>% 
+  ml_pipeline() %>%
+  ft_r_formula(Response_Speed ~ .) %>%
+  ml_decision_tree_classifier()
+
+dt_grid <- list(
+  decision_tree_classifier = list(
+    max_depth = c(3, 5, 10)
+  )
+)
+
+dt_evaluator <- ml_binary_classification_evaluator(x = sc, metricName = "areaUnderROC")
+
+# Kros-validacija
+dt_cv <- ml_cross_validator(
+  x = sc, 
+  estimator = dt_pipeline,
+  estimator_param_maps = dt_grid,
+  evaluator = dt_evaluator, 
+  num_folds = 5
+)
+
+model_dt_cv <- ml_fit(
+  x = dt_cv,
+  dataset = df_prepared_split$training
+)
+
+dt_cv_metrics <- ml_validation_metrics(model_dt_cv)
+
+dt_cv_metrics %>% 
+  ggplot(aes(max_depth_1, areaUnderROC)) + 
+  geom_line() + 
+  geom_smooth()
+```
+
+``` {r}
+# Izbor najpovoljnijeg modela
+
+dtmodel <- ml_decision_tree_classifier(
+  df_prepared_split$training,
+  Response_Speed ~ .,
+  max_depth = 5
+)
+
+dtmx <- dtmodel %>% 
+  ml_predict(df_prepared_split$test) %>% 
+  ml_metrics_binary()
+
+```
+
+* Ocenjivanje performansi klasifikacije razlicitih metoda:
+
+``` {r}
+
+metrics_df <- data.frame(
+  model = c("Logistic Regression", "Random Forest", "Decision Tree"),
+  auc_roc = NA, 
+  pr_auc = NA
+)
+
+# Fill in the metrics for each model
+metrics_df[1, "auc_roc"] <- lrmx$.estimate[1]
+metrics_df[1, "pr_auc"] <- lrmx$.estimate[2]
+
+metrics_df[2, "auc_roc"] <- rfmx$.estimate[1]
+metrics_df[2, "pr_auc"] <- rfmx$.estimate[2]
+
+metrics_df[3, "auc_roc"] <- dtmx$.estimate[1]
+metrics_df[3, "pr_auc"] <- dtmx$.estimate[2]
+
+print(metrics_df)
+
+ggplot(metrics_df, aes(x = model, y = auc_roc, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "ROC-AUC Comparison", y = "ROC-AUC") +
+  theme_minimal()
+
+ggplot(metrics_df, aes(x = model, y = pr_auc, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "PR-AUC Comparison", y = "PR-AUC") +
+  theme_minimal()
+```
+
