@@ -29,11 +29,11 @@ Ovaj skup podataka pruža detaljne informacije o svim pozivima koje je primila p
 
 ### Instalacija neophodnih paketa
 ``` {r eval=T, results = 'hide', include = FALSE}
-install.packages("dplyr")
-install.packages("ggplot2")
-install.packages("knitr")
-install.packages("ggmap")
-install.packages("sparklyr")
+#install.packages("dplyr")
+#install.packages("ggplot2")
+#install.packages("knitr")
+#install.packages("ggmap")
+#install.packages("sparklyr")
 ```
 ### Ucitavanje i priprema neophodnih biblioteka
 ``` {r eval=T, results='hide', include=FALSE}
@@ -158,17 +158,17 @@ ggplot(data = df_clean_ll, aes(x = Blurred_Longitude)) +
 
 ``` {r}
 # Postavljanje vrednosti API kljuca
-register_stadiamaps("04c1350e-f51f-4265-b458-ad6b6a3192bb", write = TRUE)
+#register_stadiamaps("04c1350e-f51f-4265-b458-ad6b6a3192bb", write = TRUE)
 # Kreiranje mape Sijetla
-seattle <- c(left = -122.45, bottom = 47.48, right = -122.2, top = 47.73)
-seattle_map <- get_stadiamap(seattle, zoom = 18)
+#seattle <- c(left = -122.45, bottom = 47.48, right = -122.2, top = 47.73)
+#seattle_map <- get_stadiamap(seattle, zoom = 18)
 # Plotovanje mape
-ggmap(seattle_map) +
- geom_point(data = df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude,  color = Final_Call_Type))
- labs(title = "Seattle Crime Map",
-      x = "Longitude",
-      y = "Latitude",
- color = "Final Call Type")
+#ggmap(seattle_map) +
+ #geom_point(data = df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude,  color = Final_Call_Type))
+ #labs(title = "Seattle Crime Map",
+      #x = "Longitude",
+      #y = "Latitude",
+ #color = "Final Call Type")
  
 ```
 
@@ -277,7 +277,7 @@ ggplot(df_times, aes(x = Response_Time)) +
 * Kako bi se izvrsila binarna klasifikacija, kreirano je novo obelezje (labela) `Response_Speed` koje ima vrednosti 'Fast' i 'Slow'. Vrednosti ovog obelezja se dodeljuju na osnovu medijalne vrednosti vremena odziva - `Response_Time`. Sve pojave koje imaju vreme odziva manje od medijalne ce imati vrednost labele `Response_Speed` - 'Fast', dok ce ostale pojave imati vrednost - 'Slow'. Sledeci kod prikazuje kreiranje ovog obelezja u skupu podataka: 
 
 ``` {r}
-#dft <- df_times %>% collect()
+dft <- df_times %>% collect()
 median_value <- median(dft$Response_Time)
 df_prepared <- df_times %>%
   mutate(Response_Speed = if_else(Response_Time <= median_value, 1, 0))
