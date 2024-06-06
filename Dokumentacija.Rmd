@@ -3,40 +3,59 @@ title: "Analiza policijskih akcija na teritoriji grada Sijetla"
 author: "Miloš Gravara"
 date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
 ```
+
 ### Skup podataka o policijskim akcijama na teritoriji grada Sijetla
 
-Ovaj skup podataka sadrži informacije o pozivima policiji i odgovarajućim policijskim akcijama u Sijetlu. Kolone u skupu podataka su sledeće:
-1. **CAD.Event.Number** - Jedinstveni identifikacioni broj događaja. 
-2. **Event.Clearance.Description** - Policijski kako je događaj završen.
-3. **Call.Type** - Tip poziva sa 10 različitih vrednosti (911, Alarm, Onview...)
-4. **Priority** - Prioritet poziva sa vrednostima od 1 (najmanjeg prioriteta) do 9 (najvišeg)
-5. **Initial.Call.Type** - Prvobitna klasifikacija poziva od strane primaoca poziva u 911 centru, sa 325 različitih vrednosti 
-6. **Final.Call.Type** - Konačna klasifikacija poziva od strane policijskog službenika nakon pregleda, sa 431 različitom vrednošću
-7. **Original.Time.Queued** - Vreme kada je poziv zabeležen
-8. **Arrived.Time** - Vreme kada je policija stigla na lice mesta. 
-9. **Precinct** - Policijska stanica u Sijetlu 
-10. **Sector** - Policijski sektor 
-11. **Beat** - Teritorija i vreme tokom kojeg policijski službenih patrolira 
+Skup podataka o policijskim akcijama na teritoriji grada Sijetla
+obuhvata kolekciju događaja o pozivima ka 911 pozivnom centru
+zabeleženih od 2010. godine do danas. Skup sadrži oko 6 miliona događaja
+i veličine je 1.1GB. Skup podataka je otvoren i preuzet je sa zvaničnog
+sajta grada Sijetla i dostupan je na
+[linku](https://data.seattle.gov/Public-Safety/Call-Data/33kz-ixgy/about_data).
+
+Ovaj skup podataka sadrži informacije o pozivima policiji i
+odgovarajućim policijskim akcijama u Sijetlu. Kolone u skupu podataka su
+sledeće:
+
+1.  **CAD.Event.Number** - Jedinstveni identifikacioni broj događaja.
+2.  **Event.Clearance.Description** - Policijski kako je događaj
+    završen.
+3.  **Call.Type** - Tip poziva sa 10 različitih vrednosti (911, Alarm,
+    Onview...)
+4.  **Priority** - Prioritet poziva sa vrednostima od 1 (najmanjeg
+    prioriteta) do 9 (najvišeg)
+5.  **Initial.Call.Type** - Prvobitna klasifikacija poziva od strane
+    primaoca poziva u 911 centru, sa 325 različitih vrednosti
+6.  **Final.Call.Type** - Konačna klasifikacija poziva od strane
+    policijskog službenika nakon pregleda, sa 431 različitom vrednošću
+7.  **Original.Time.Queued** - Vreme kada je poziv zabeležen
+8.  **Arrived.Time** - Vreme kada je policija stigla na lice mesta.
+9.  **Precinct** - Policijska stanica u Sijetlu
+10. **Sector** - Policijski sektor
+11. **Beat** - Teritorija i vreme tokom kojeg policijski službenih
+    patrolira
 12. **Blurred_Longitude** - Geografska dužina događaja
 13. **Blurred_Latitude** - Geografska širina događaja
 
-Ovaj skup podataka pruža detaljne informacije o svim pozivima koje je primila policija, uključujući tipove poziva, prioritete, vremena poziva i dolaska policije, kao i geografske lokacije događaja (zamaskirane). Takođe uključuje početnu i konačnu klasifikaciju svakog poziva, što omogućava analizu kako se incidenti klasifikuju i rešavaju.
+Skup podataka pruža detaljne informacije o svim pozivima koje je primila
+policija, uključujući tipove poziva, prioritete, vremena poziva i
+dolaska policije, kao i geografske lokacije događaja. Takođe uključuje
+početnu i konačnu klasifikaciju svakog poziva, što omogućava analizu
+kako se incidenti klasifikuju i rešavaju.
 
-### Instalacija neophodnih paketa
-``` {r eval=T, results = 'hide', include = FALSE}
-#install.packages("dplyr")
-#install.packages("ggplot2")
-#install.packages("knitr")
-#install.packages("ggmap")
-#install.packages("sparklyr")
-```
-### Ucitavanje i priprema neophodnih biblioteka
-``` {r eval=T, results='hide', include=FALSE}
+# Inicijalna priprema podataka
+
+## Učitavanje i priprema neophodnih biblioteka
+
+```{r eval=T, results='hide', include=FALSE}
 library(dplyr)
 library(ggplot2)
 library(knitr)
@@ -52,11 +71,16 @@ sc <- spark_connect(master = "local",
                     version = "3.5",
                     config = conf)
 ```
-### Ucitavanje podataka
 
-S obzirom na veličinu skupa podataka (1.1GB), podaci se učitavaju i dalje transformišu uz pomoć Apache Spark alata.
+## Učitavanje podataka
 
-``` {r eval = T, results = 'hold'}
+-   S obzirom na veličinu skupa podataka (1.1GB), podaci se učitavaju i
+    dalje transformišu uz pomoć Apache Spark alata.
+
+-   Kako bi se učitali odgovarajući tipovi podataka, specificirana je
+    šema spram koje alat spark učitava okvire podataka.
+
+```{r eval = T, results = 'hold'}
 schema <- list(
   CAD.Event.Number = "character",
   Event.Clearance.Description = "character",
@@ -76,17 +100,41 @@ schema <- list(
 df <- spark_read_csv(sc, name = "police_calls", path = "Call_Data.csv", header = TRUE, columns = schema)
 ```
 
-### Priprema podataka za analizu
+## Priprema podataka za analizu
 
-Kako bi se mogla vršiti adekvatna analiza podataka neophodno je uraditi nekoliko transformacija na početnom skupu podataka: 
+-   Kako bi se mogla vršiti adekvatna analiza podataka neophodno je
+    uraditi nekoliko transformacija na početnom skupu podataka:
 
-* Izbacivanje svih nepostojećih vrednosti iz skupa 
+### Izbacivanje svih nepostojećih vrednosti iz skupa
 
-``` {r eval=T, results='hold'}
+```{r eval=T, results='hold'}
 df_clean <- df %>% na.omit()
 ```
 
-``` {r}
+### Konverzija podataka u odgovarajući format
+
+```{r eval = T, results='hold'}
+df_clean <- df_clean %>%
+  mutate(
+    Original_Time_Queued = to_timestamp(Original_Time_Queued, "MM/dd/yyyy hh:mm:ss a"),
+    Arrived_Time = to_timestamp(Arrived_Time, "MM/dd/yyyy hh:mm:ss a")
+  )
+```
+
+### Filtriranje slučajeva kada je vreme dolaska policije pre vremena dešavanja incidenta
+
+-   Ovo je nemoguć slučaj
+
+```{r}
+df_clean <- df_clean %>%
+  filter(!is.na(Original_Time_Queued) & !is.na(Arrived_Time) & Original_Time_Queued < Arrived_Time)
+```
+
+# Vizualizacija raspodele po pojedinačnim obeležjima i odnosa između obeležja
+
+### Prikaz statističkih podataka o vremenima incidenata
+
+```{r}
 df_clean %>% summarise(
   min_original_time = min(Original_Time_Queued, na.rm = TRUE),
   max_original_time = max(Original_Time_Queued, na.rm = TRUE),
@@ -95,24 +143,9 @@ df_clean %>% summarise(
 ) %>% collect()
 ```
 
-``` {r eval = T, results='hold'}
-df_clean <- df_clean %>%
-  mutate(
-    Original_Time_Queued = to_timestamp(Original_Time_Queued, "MM/dd/yyyy hh:mm:ss a"),
-    Arrived_Time = to_timestamp(Arrived_Time, "MM/dd/yyyy hh:mm:ss a")
-  )
-```
+### Vizualizacija raspodele po policijskim upravama:
 
-``` {r}
-df_clean <- df_clean %>%
-  filter(!is.na(Original_Time_Queued) & !is.na(Arrived_Time) & Original_Time_Queued < Arrived_Time)
-```
-
-### Vizualizacija raspodele po pojedinacnim obelezjima i odnosa izmedju obelezja
-
-##### Vizualizacija raspodele po policijskim upravama: 
-
-``` {r}
+```{r}
 precinct_counts <- df_clean %>%
   group_by(Precinct) %>%
   summarise(Count = n())
@@ -124,70 +157,118 @@ ggplot(precinct_counts, aes(x = Precinct, y = Count, fill = Precinct)) +
        y = "Broj pojava",
        fill = "Precinct")
 ```
-* Moze se primetiti da je najvise policijskih reakcija bilo u severnoj i zapadnoj policijskoj upravi.
 
-##### Vizualizacija raspodele po nacinu razresavanja slucaja:
+-   Moze se primetiti da je najviše policijskih reakcija bilo u severnoj
+    i zapadnoj policijskoj upravi.
 
-``` {r}
+### Vizualizacija raspodele po načinu razrešenja slučaja:
+
+```{r}
 clearence_counts <- df_clean %>%
   group_by(Event_Clearance_Description) %>%
   summarise(Count = n())
 
+clearence_counts <- clearence_counts %>% filter(Count >= 5000)
+
 ggplot(clearence_counts, aes(x = Event_Clearance_Description, y = Count, fill = Event_Clearance_Description)) +
   geom_bar(stat = "identity") +
-  labs(title = "Prikaz raspodele po nacinu razresenja slucaja",
+  labs(title = "Prikaz raspodele po načinu razrešenja",
        x = "Rezolucija",
        y = "Broj pojava",
-       fill = "Clearence")
+       fill = "Način razrešenja") +
+  theme(axis.text.x = element_blank())
 ```
 
-##### Vizualizacija raspodele geografske sirine i duzine
+### Vizualizacija raspodele prema prioritetu
 
-* Pravljenjem histograma za lokacijske podatke, može se primetiti da postoji određeni broj događaja koji imaju pogrešno specificiranu geografsku širinu ili dužinu. Naredni isečak koda prikazuje raspodele vrednosti geografske širine i dužine, kao i sređivanje tih vrednosti kako bi odgovarale koordinatama grada Sijetla. 
+```{r}
+priority_counts <- df_clean %>%
+  group_by(Priority) %>%
+  summarise(Count = n())
 
-``` {r eval=T, results='hold'}
+ggplot(priority_counts, aes(x = Priority, y = Count, fill = Priority)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Prikaz raspodele po prioritetu",
+       x = "Prioritet",
+       y = "Broj pojava",
+       fill = "Prioritet")
+```
+
+### Vizualizacija raspodele po načinu poziva 911 centra
+
+```{r}
+call_type_counts <- df_clean %>%
+  group_by(Call_Type) %>%
+  summarise(Count = n())
+
+call_type_counts <- call_type_counts %>% filter(Count > 5000)
+
+ggplot(call_type_counts, aes(x = Call_Type, y = Count, fill = Call_Type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Prikaz raspodele po načinu poziva",
+       x = "Način poziva",
+       y = "Broj pojava",
+       fill = "Način Poziva") +
+  theme(axis.text.x = element_blank())
+```
+
+### Vizualizacija raspodele geografske širine i dužine
+
+-   Pravljenjem histograma za lokacijske podatke, može se primetiti da
+    postoji određeni broj događaja koji imaju pogrešno specificiranu
+    geografsku širinu ili dužinu. Naredni isečak koda prikazuje
+    raspodele vrednosti geografske širine i dužine, kao i sređivanje tih
+    vrednosti kako bi odgovarale koordinatama grada Sijetla.
+
+```{r eval=T, results='hold'}
 ggplot(data = df_clean, aes(x = Blurred_Longitude)) +
   geom_histogram(bins = 30, fill = "skyblue", color = "black") +
-  labs(title = "Histogram geografske širine",
+  labs(title = "Raspodela geografske širine",
        x = "Geografksa širina",
        y = "Frekvencija")
 ```
 
-``` {r eval=T, results='hold'}
+```{r eval=T, results='hold'}
 ggplot(data = df_clean, aes(x = Blurred_Latitude)) +
   geom_histogram(bins = 30, fill = "skyblue", color = "black") +
-  labs(title = "Histogram geografske dužine",
+  labs(title = "Raspodela geografske dužine",
        x = "Geografksa dužina",
        y = "Frekvencija")
 ```
 
-* Moze se primetiti na histogramima da postoji odredjeni broj entiteta koji imaju pogresno unete koordinate geografske sirine i duzine. S obzirom na to da ne postoji prevelik broj ovakvih entiteta, oni se mogu izbaciti iz skupa podataka. To se moze uraditi na sledeci nacin:
+-   Može se primetiti na histogramima da postoji određeni broj entiteta
+    koji imaju pogrešno unete koordinate geografske širine i dužine. S
+    obzirom na to da ne postoji prevelik broj ovakvih entiteta, oni se
+    mogu izbaciti iz skupa podataka. To se može uraditi na sledeći
+    način:
 
-``` {r}
+```{r}
 df_clean_ll <- df_clean %>% filter(Blurred_Latitude >= 47 & Blurred_Latitude <= 48 & Blurred_Longitude >= -123 & Blurred_Longitude <= -122)
 ```
 
-##### Histogrami raspodele geografske sirine i duzine za ociscene vrednosti
+### Histogrami raspodele geografske širine i dužine za očišćene vrednosti
 
-``` {r}
+```{r}
 ggplot(data = df_clean_ll, aes(x = Blurred_Longitude)) +
   geom_histogram(bins = 30, fill = "skyblue", color = "black") +
-  labs(title = "Histogram geografske širine",
+  labs(title = "Raspodele prečišćene geografske širine",
        x = "Geografksa širina",
        y = "Frekvencija")
 ```
 
-``` {r}
+```{r}
 ggplot(data = df_clean_ll, aes(x = Blurred_Longitude)) +
   geom_histogram(bins = 30, fill = "skyblue", color = "black") +
-  labs(title = "Histogram geografske širine",
+  labs(title = "Raspodele prečišćene geografske širine",
        x = "Geografksa širina",
        y = "Frekvencija")
 ```
 
-* Raspodela ovih vrednosti se moze prikazati i na mapi, uz upotrebu **ggmap** biblioteke i stadiamaps API kljuca, sto prikazuje sledeci isecak koda:
+-   Raspodela ovih vrednosti se može prikazati i na mapi, uz upotrebu
+    **ggmap** biblioteke i stadiamaps API kljuca, što prikazuje sledeći
+    isečak koda:
 
-``` {r eval = FALSE}
+```{r eval = FALSE}
 # Postavljanje vrednosti API kljuca
 register_stadiamaps("04c1350e-f51f-4265-b458-ad6b6a3192bb", write = TRUE)
 # Kreiranje mape Sijetla
@@ -196,28 +277,37 @@ seattle_map <- get_stadiamap(seattle, zoom = 18)
 # Plotovanje mape
 ggmap(seattle_map) +
  geom_point(data = df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude,  color = Final_Call_Type))
- labs(title = "Seattle Crime Map",
-      x = "Longitude",
-      y = "Latitude",
+ labs(title = "Mapa grada Sijetla",
+      x = "Geografska širina",
+      y = "Geografska širina",
  color = "Final Call Type")
 ```
 
-``` {r}
+```{r}
 include_graphics("Slike/PointsOnTheMap.png")
 ```
 
-##### Vizualizacija raspodele kategorija
+### Vizualizacija raspodele kategorija
 
-* Sledeca stvar koja se mora uzeti u obzir jesu inicijalne i finalne kategorije poziva predstavljene kolonama Initial_Call_Type i Final_Call_Type. S obzirom na to da Initial_Call_Type sadrzi 287 razlicitih kategorija, a Final_Call_Type 402 razlicite kategorije, ideja je da se ove kategorije grupisu u natkategorije kako bi se podaci lakse analizirali i vizualizovali. Sledeci isecak koda prikazuje funkciju `map_call_types` kojom se vrsi grupisanje ovih kategorija: 
+-   Sledeća stvar koja se mora uzeti u obzir jesu inicijalne i finalne
+    kategorije poziva predstavljene kolonama `Initial_Call_Type` i
+    `Final_Call_Type`. S obzirom na to da `Initial_Call_Type` sadrzi 287
+    različitih kategorija, a `Final_Call_Type` 402 različite kategorije,
+    ideja je da se ove kategorije grupisu u natkategorije kako bi se
+    podaci lakše analizirali i vizualizovali. Sledeći isečak koda
+    prikazuje funkciju `map_call_types` kojom se vrši grupisanje ovih
+    kategorija:
 
-``` {r}
+```{r}
 df_collected <- df_clean_ll %>% collect()
 print(length(unique(df_collected$Initial_Call_Type)))
 print(length(unique(df_collected$Final_Call_Type)))
 ```
-* Sledeci isecak koda prikazuje grupisanje inicijalnih kategorija poziva u natkategorije: 
 
-``` {r}
+-   Sledeći isečak koda prikazuje grupisanje inicijalnih kategorija
+    poziva u natkategorije:
+
+```{r}
 df_clean_ll <- df_clean_ll %>%
   mutate(Initial_Category = case_when(
     grepl("ASLT|Assault|ASSAULT|ASSAULTS|HARRASMENT|THREAT|THREATS|WEAPON|GUN|PANHANDLING|HARASSMENT|VIOLENT", Initial_Call_Type) ~ "Assaults and Threats",
@@ -237,9 +327,9 @@ df_clean_ll <- df_clean_ll %>%
   ))
 ```
 
-* Primena i na finalnu kategoriju poziva: 
+-   Primena i na finalnu kategoriju poziva:
 
-``` {r}
+```{r}
 df_clean_ll <- df_clean_ll %>%
   mutate(Final_Category = case_when(
     grepl("ASLT|Assault|ASSAULT|ASSAULTS|HARRASMENT|THREAT|THREATS|WEAPON|GUN|PANHANDLING|HARASSMENT|VIOLENT", Final_Call_Type) ~ "Assaults and Threats",
@@ -259,9 +349,12 @@ df_clean_ll <- df_clean_ll %>%
   ))
 ```
 
-* S obzirom na to da je moguce da se desi da inicijalna kategorizacija od strane 911 operatera ne odgovara finalnoj kategorizaciji dogadjaja od strane policajca, sledeci dijagram prikazuje raspodelu slucajeva kada je finalna kategorizacija odgovarala incijalnoj i obrnuto: 
+-   S obzirom na to da je moguće da se desi da inicijalna kategorizacija
+    od strane 911 operatera ne odgovara finalnoj kategorizaciji događaja
+    od strane policajca, sledeći dijagram prikazuje raspodelu slučajeva
+    kada je finalna kategorizacija odgovarala incijalnoj i obrnuto:
 
-``` {r}
+```{r}
 same_diff_counts <- df_clean_ll %>%
   group_by(Same_Category = ifelse(Initial_Category == Final_Category, "Ista", "Razlicita")) %>%
   summarise(Count = n())
@@ -272,12 +365,12 @@ ggplot(same_diff_counts, aes(x = Same_Category, y = Count, fill = Same_Category)
   labs(title = "Poredjenje inicijalne i finalne kategorije",
        x = "Kategorija",
        y = "Broj pojava",
-       fill = "Category")
+       fill = "Kategorija")
 ```
 
-* Raspodela finalnih kategorizacija je prikazana na narednom stubicastom dijagramu: 
+##### Raspodela inicijalnih kategorija
 
-``` {r Raspodela inicijalnih kategorija nakon grupisanja}
+```{r Raspodela inicijalnih kategorija nakon grupisanja}
 initial_category_counts <- df_clean_ll %>%
   group_by(Initial_Category) %>%
   summarise(Count = n())
@@ -290,7 +383,9 @@ ggplot(initial_category_counts, aes(x = reorder(Initial_Category, -Count), y = C
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-``` {r Raspodela finalnih kategorija nakon grupisanja}
+##### Raspodela finalnih kategorija
+
+```{r Raspodela finalnih kategorija nakon grupisanja}
 final_category_counts <- df_clean_ll %>%
   group_by(Final_Category) %>%
   summarise(Count = n())
@@ -305,8 +400,8 @@ ggplot(final_category_counts, aes(x = reorder(Final_Category, -Count), y = Count
 
 ##### Vizualizacija finalne kategorije prijave spram geografske sirine i duzine
 
-``` {r Odnos Finalne kategorije i geografske lokacije}
-ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Final_Category)) +
+```{r Odnos Finalne kategorije i geografske lokacije}
+ggplot(df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Final_Category)) +
   geom_point(alpha = 0.6) +  
   labs(title = "Visualization odnosa finalne kategorije i lokacije prijave",
        x = "Geografska sirina",
@@ -316,12 +411,15 @@ ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Fin
   theme(legend.position = "bottom")
 ```
 
-* Na dijagramu iznad se moze videti da raspodela kategorija prekrsaja i zlocina ne zavisi od geografske sirine i duzine, stoga nema preteranog smisla pokusavati vrsiti klasterizaciju nad ovim vrednostima.
+-   Na dijagramu iznad se moze videti da raspodela kategorija prekrsaja
+    i zlocina ne zavisi od geografske sirine i duzine, stoga nema
+    preteranog smisla pokusavati vrsiti klasterizaciju nad ovim
+    vrednostima.
 
-##### Vizualizacija odnosa sektora i lokacije prijave:
+### Vizualizacija odnosa sektora i lokacije prijave:
 
-``` {r Odnos sektora grada Sijetla i geografske lokacije}
-ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Sector)) +
+```{r Odnos sektora grada Sijetla i geografske lokacije}
+ggplot(df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Sector)) +
   geom_point(alpha = 0.6) +  
   labs(title = "Visualization odnosa sektora i lokacije prijave",
        x = "Geografska sirina",
@@ -331,10 +429,10 @@ ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Sec
   theme(legend.position = "bottom")
 ```
 
-##### Vizualizacija odnosa policijske uprave i lokacije prijave
+### Vizualizacija odnosa policijske uprave i lokacije prijave
 
-``` {r Odnos policijske uprave i geografske lokacije}
-ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Precinct)) +
+```{r Odnos policijske uprave i geografske lokacije}
+ggplot(df_clean_ll, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Precinct)) +
   geom_point(alpha = 0.6) +  
   labs(title = "Visualization odnosa policijske uprave i lokacije prijave",
        x = "Geografska sirina",
@@ -344,45 +442,67 @@ ggplot(df_prepared, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = Pre
   theme(legend.position = "bottom")
 ```
 
-* Sa druge strane, moze se uvideti da su odgovarajuce policijske uprave odgovorne za reakcije na odredjenim teritorijama grada, sto ga ovaj skup podataka cini pogodnim za klasterizaciju spram vrednosti tih obelezja. 
+-   Sa druge strane, može se uvideti da su odgovarajuće policijske
+    uprave odgovorne za reakcije na odredjenim teritorijama grada, što
+    ga ovaj skup podataka cini pogodnim za klasterizaciju spram
+    geografske lokacije.
 
-##### Priprema podataka za klasfikaciju
+# Priprema podataka za klasfikaciju
 
-* Jedna od mogucnosti za klasifikaciju jeste procena brzine policijske reakcije na osnovu prijavljenog dogadjaja. S obzirom na to da mnogi faktori mogu da uticu na brzinu reakcije, poput geografske lokacije, sektora policijske stanice, kategorije poziva, aktivne jedinice patroliranja, prioriteta i inicijalnog vremena, moguce je na osnovu obelezja Arrival.Time, labelirati podatke na osnovu da li je reakcija bila brza ili nije, pa vrsiti binarnu klasifikaciju. Kako bi se moglo utvrditi sta je brza reakcija, a sta ne, najpre ce se skicirati histogram petominutnih intervala kako bi se uvidela raspodela pojava. 
+-   Jedna od mogućnosti za klasifikaciju jeste procena brzine policijske
+    reakcije na osnovu prijavljenog događaja. S obzirom na to da mnogi
+    faktori mogu da utiču na brzinu reakcije, poput geografske lokacije,
+    sektora policijske stanice, kategorije poziva, aktivne jedinice
+    patroliranja, prioriteta i inicijalnog vremena, moguce je na osnovu
+    obelezja `Arrival_Time`, labelirati podatke na osnovu da li je
+    reakcija bila brza ili nije, pa vršiti binarnu klasifikaciju. Kako
+    bi se moglo utvrditi sta je brza reakcija, a šta ne, najpre će se
+    predstaviti histogram petominutnih intervala kako bi se uvidela
+    raspodela pojava.
 
-* Racunanje vremena odziva na dogadjaj: 
-``` {r}
+### Računanje vremena odziva na događaj:
+
+```{r}
 df_times <- df_clean_ll %>%
   mutate(
     Response_Time = (unix_timestamp(Arrived_Time) - unix_timestamp(Original_Time_Queued)) / 60
   )
 ```
 
-* Plotovanje histograma kako bi se uvidela raspodela vremena odziva: 
+### Prikaz histograma kako bi se uvidela raspodela vremena odziva:
 
-``` {r}
+```{r}
 # Plot histogram with 5-minute bins
 df_times <- df_times %>% filter(Response_Time >= 0 & Response_Time <= 1000)
 
 ggplot(df_times, aes(x = Response_Time)) +
   geom_histogram(binwidth = 10, fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Response Times",
-       x = "Response Time (minutes)",
-       y = "Frequency")
+  labs(title = "Raspodela vremena odziva",
+       x = "Vreme odziva (minut)",
+       y = "Frekvencija")
 ```
 
-* Kako bi se izvrsila binarna klasifikacija, kreirano je novo obelezje (labela) `Response_Speed` koje ima vrednosti 'Fast' i 'Slow'. Vrednosti ovog obelezja se dodeljuju na osnovu medijalne vrednosti vremena odziva - `Response_Time`. Sve pojave koje imaju vreme odziva manje od medijalne ce imati vrednost labele `Response_Speed` - 'Fast', dok ce ostale pojave imati vrednost - 'Slow'. Sledeci kod prikazuje kreiranje ovog obelezja u skupu podataka: 
+-   Kako bi se izvršila binarna klasifikacija, kreirano je novo obeležje
+    (labela) `Response_Speed` koje ima vrednosti 1 i 0. Vrednosti ovog
+    obeležja se dodeljuju na osnovu medijalne vrednosti vremena odziva -
+    `Response_Time`. Sve pojave koje imaju vreme odziva manje od
+    medijalne ce imati vrednost labele `Response_Speed` - 1, što
+    reprezentuje brz odziv, dok će ostale pojave imati vrednost - 0,
+    odnosno spor odziv. Sledeći kod prikazuje kreiranje ovog obeležja u
+    skupu podataka:
 
-``` {r}
+### Kreiranje labele brzine odziva
+
+```{r}
 dft <- df_times %>% collect()
 median_value <- median(dft$Response_Time)
 df_prepared <- df_times %>%
   mutate(Response_Speed = if_else(Response_Time <= median_value, 1, 0))
 ```
 
-##### Prikaz raspodele brzine odziva
+### Prikaz raspodele brzine odziva
 
-``` {r}
+```{r}
 response_speeds <- df_prepared %>%
   group_by(Response_Speed) %>%
   summarise(Count = n())
@@ -392,14 +512,18 @@ ggplot(response_speeds, aes(x = Response_Speed, y = Count, fill = Response_Speed
   labs(title = "Raspodela brzina odziva",
        x = "Brzina odziva",
        y = "Broj pojava",
-       fill = "Response_Speed")
+       fill = "Brzina odziva")
 ```
 
-##### Vizualizacija odnosa izmedju prediktorskih obelezja i ciljnog obelezja:
+### Vizualizacija odnosa izmedju prediktorskih obeležja i ciljnog obeležja:
 
-* Naredna sekcija ima za cilj da prikaze kako razlicite vrednosti prediktorskih obelezja uticu na brzinu odziva policijske jedinice na poziv. Naredni isecak koda ima za cilj da prikaze kako prioritet, inicijalna kategorija poziva, lokacija i sektor uticu na vremena odziva.  
+-   Naredna sekcija ima za cilj da prikaže kako različite vrednosti
+    prediktorskih obeležja utiču na brzinu odziva policijske jedinice na
+    poziv. Naredni isecak koda ima za cilj da prikaze kako prioritet,
+    inicijalna kategorija poziva, lokacija i sektor uticu na vremena
+    odziva.
 
-``` {r}
+```{r}
 ggplot(df_prepared, aes(x = Priority, y = Response_Time)) +
   geom_boxplot() +
   labs(title = "Response Time vs. Priority", x = "Priority", y = "Response Time")
@@ -419,13 +543,27 @@ ggplot(df_prepared, aes(x = Sector, y = Response_Time)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-### Klasifikacija
+-   Može se primetiti da se za događaje koji su visokog prioriteta
+    dešava brza reakcija policije, što je i očekivano.
+-   Takođe, i za određene inicijalne kategorije, kao što su
+    `Domestic Violence` i `Emergency and Critical Incidents` dešava brza
+    reakcija.
+-   Sa druge strane, korelacija između brzine odziva i geografske
+    lokacije, nije previše očigledna, s obzirom na to da postoji
+    uniformna raspodela brzina odziva u odnosu na geografsku lokaciju.
 
-#### Priprema skupa podataka za obucavanje
+# Klasifikacija
 
-* Naredni isecak koda prikazuje podelu skupa podataka na trening i validacioni set:
+### Priprema skupa podataka za obucavanje
 
-``` {r Priprema skupa podataka}
+-   S obzirom na to da je cilj klasifikacije da se utvrdi brzina
+    odgovora policijske jedinice, kao prediktorska obeležja su izabrani:
+    `Response_Time`, `Sector`, `Precinct`, `Initial_Category`,
+    `Longitude` i `Latitude`
+-   Naredni isečak koda prikazuje podelu skupa podataka na trening i
+    validacioni set:
+
+```{r Priprema skupa podataka}
 df_prepared_split <- df_prepared %>%
   select(Response_Time, Response_Speed, Sector, Precinct, Initial_Category, Blurred_Longitude, Blurred_Latitude, Priority) %>%
   sdf_random_split(training = 0.8,
@@ -433,11 +571,18 @@ df_prepared_split <- df_prepared %>%
                    seed = 100)
 ```
 
-#### Kreiranje razlicitih klasifikacionih modela sa razlicitim hiperparametrima:
+### Logistička regresija
 
-##### Logisticka regresija
+-   Za potrebe evaluacije modela logističke regresije i izbora
+    najpovoljnijeg modela, kreirana su tri scenarija sa različitim
+    vrednostima regularizacionog parametra lambda.
+    
+-   Za evaluaciju modela je korišćena areaUnderROC metrika koja reprezentuje 
+    sposobnost klasifikacionog modela da razvrsta dve klase. 
 
-``` {r Priprema modela logisticke regresije}
+##### Priprema modela, scenarija i treniranje
+
+```{r Priprema modela logističke regresije}
 # Logistic Regression
 log_pipeline <- sc %>% 
   ml_pipeline() %>%
@@ -468,13 +613,23 @@ model_cv <- ml_fit(
 
 cv_metrics <- ml_validation_metrics(model_cv)
 
+print(cv_metrics)
+```
+
+##### Prikaz performansi modela logističke regresije za različite scenarije
+
+``` {r}
 cv_metrics %>% 
   ggplot(aes(reg_param_1, areaUnderROC)) + 
   geom_line() + 
   geom_smooth()
 ```
 
-``` {r Testiranje performansi modela}
+-   Analiziranjem dijagrama se može utvrditi da se najbolje performanse dobijaju za vrednost 0.01 regularizacionog      parametra.
+
+##### Izbor najpovoljnijeg modela
+
+```{r Testiranje performansi modela logističke regresije}
 # Na osnovu grafa se utvrdjuje da je model sa parametrom regularizacije 0.01 najbolji
 lmodel <- ml_logistic_regression(
   df_prepared_split$training,
@@ -487,9 +642,18 @@ lrmx <- lmodel %>%
   ml_metrics_binary()
 ```
 
-##### Random Forest algoritam 
+### Random Forest algoritam
 
-``` {r Priprema random forest modela}
+-   Za potrebe evaluacije random forest modela i izbora
+    najpovoljnijeg, kreirana su tri scenarija sa različitim
+    brojem stabala.
+    
+-   Za evaluaciju modela je korišćena areaUnderROC metrika koja reprezentuje 
+    sposobnost klasifikacionog modela da razvrsta dve klase. 
+
+##### Priprema random forest modela
+
+```{r Priprema random forest modela}
 # Random Forest
 rf_pipeline <- sc %>% 
   ml_pipeline() %>%
@@ -498,7 +662,7 @@ rf_pipeline <- sc %>%
 
 rf_grid <- list(
   random_forest_classifier = list(  
-    num_trees = c(10, 30, 50)
+    num_trees = c(3, 25, 50)
   )
 )
 
@@ -520,13 +684,23 @@ model_rf_cv <- ml_fit(
 
 rf_cv_metrics <- ml_validation_metrics(model_rf_cv)
 
+print(rf_cv_metrics)
+```
+
+##### Prikaz performansi random forest modela za različite scenarije
+
+``` {r}
 rf_cv_metrics %>% 
   ggplot(aes(num_trees_1, areaUnderROC)) + 
   geom_line() + 
   geom_smooth()
 ```
 
-``` {r Testiranje performansi modela}
+-   Može se primetiti da se performanse poboljšavaju za veći broj stabala.
+
+##### Izbor najpovoljnijeg modela
+
+```{r Testiranje performansi modela random foresta}
 # Izbor najboljeg modela
 
 rfmodel <- ml_random_forest_classifier(
@@ -540,9 +714,15 @@ rfmx <- rfmodel %>%
   ml_metrics_binary()
 ```
 
-##### Decision Trees
+### Stabla odlučivanja
 
-``` {r Priprema modela stabla odlucivanja}
+-   Za potrebe evaluacije modela stabla odlučivanja i izbora
+    najpovoljnijeg, kreirana su tri scenarija sa različitom dubinom stabala.
+    
+-   Za evaluaciju modela je korišćena areaUnderROC metrika koja reprezentuje 
+    sposobnost klasifikacionog modela da razvrsta dve klase. 
+
+```{r Priprema modela stabla odlucivanja}
 dt_pipeline <- sc %>% 
   ml_pipeline() %>%
   ft_r_formula(Response_Speed ~ .) %>%
@@ -572,13 +752,24 @@ model_dt_cv <- ml_fit(
 
 dt_cv_metrics <- ml_validation_metrics(model_dt_cv)
 
+print(dt_cv_metrics)
+```
+
+##### Prikaz performansi modela stabla odlučivanja za različite scenarije 
+
+``` {r}
 dt_cv_metrics %>% 
   ggplot(aes(max_depth_1, areaUnderROC)) + 
   geom_line() + 
   geom_smooth()
 ```
 
-``` {r Testiranje performansi modela}
+- Može se primetiti da sa povećanjem dubine stabla se povećavaju i performanse modela. 
+- Ipak treba uzeti u obzir da se sa povećanjem dubine stabla povećava i rizik da se model pretrenira.
+
+##### Izbor najpovoljnijeg modela
+
+```{r Testiranje performansi modela stabla odlučivanja}
 # Izbor najpovoljnijeg modela
 
 dtmodel <- ml_decision_tree_classifier(
@@ -593,9 +784,11 @@ dtmx <- dtmodel %>%
 
 ```
 
-#### Ocenjivanje performansi klasifikacije razlicitih metoda:
+### Ocenjivanje performansi klasifikacije razlicitih metoda:
 
-``` {r}
+-   Kako bi se ocenile performanse različitih modela, korišćene su areaUnderROC i areaUnderPR metrike
+
+```{r}
 
 metrics_df <- data.frame(
   model = c("Logistic Regression", "Random Forest", "Decision Tree"),
@@ -626,88 +819,206 @@ ggplot(metrics_df, aes(x = model, y = pr_auc, fill = model)) +
   theme_minimal()
 ```
 
-### Klasterizacija
+-   Dijagrami iznad prikazuju odnos ovih metrika između različitih modela
+-   Može se primetiti da najbolje performanse pruža random forest model
 
-#### Priprema skupa podataka i parametara za klasterizaciju
+# Klasterizacija
 
-``` {r Priprema skupa podataka i parametara za klasterizaciju}
-df_clustering <- df_prepared %>%
-  select(Blurred_Longitude, Blurred_Latitude, Precinct) %>%
-  collect()
+-   Ideja je da se klasterizacija vrši spram geografske širine i dužine
+    kako bi se utvrdilo da li postoji određena korelacija između
+    pojedinačnih obeležja i lokacije unutar grada Sijetla. Na primer,
+    moglo bi se pokušati utvrditi da li postoji veza između tipa
+    incidenta koji se dogodio i određenih delova grada Sijetla. Pored
+    toga, može se utvrditi i veza između lokacije incidenta i policijske
+    uprave koja je odgovorna za taj incident.
+-   Kako bi se izvršila klasterizacija, najpre je neophodno pripremiti
+    skup podataka za algoritme.
 
-df_clustering$Priority <- as.numeric(as.factor(df_clustering$Precinct))
+### Priprema podataka za klasterizaciju
 
-set.seed(123) 
+-   U okviru pripreme skupa podataka izvdojeni su geografska širina i
+    dužina, jer će se na osnovu njih, za početak, utvrđivati pogodan
+    broj klastera.
 
-# Scenario 1
-eps_value_1 <- 0.5  # Postavka velicine epsilon okoline 
-min_samples_1 <- 15  # Minimalan broj 
+```{r}
+dataset.clustering <- df_times %>%
+  select(Blurred_Longitude, Blurred_Latitude, Final_Category, Precinct)
 
-# Scenario 2
-eps_value_2 <- 0.1
-min_samples_2 <- 100
-
-df_clustering_scaled <- df_clustering %>%
-  mutate(across(everything(), scale))
 ```
 
-##### Vrsenje klasterizacije prema dva scenarija
+### Ispitivanje pogodne veličine klastera primenom lakat metode
 
-``` {r}
-#install.packages("dbscan")
-library(dbscan)
+-   Da bi se utvrdio najpovoljniji broj klastera, primenjena je lakat
+    metoda (engl. *Elbow method*) koja prikazuje sumu kvadratne greške
+    za specificirane brojeve klastera.
 
-dbscan_result_1 <- dbscan(df_clustering_scaled, eps = eps_value_1, minPts = min_samples_1)
-df_clustering$cluster_scenario_1 <- factor(dbscan_result_1$cluster)
+```{r}
+# Funkcija koja racuna within-cluster-sum-of-squares
 
-dbscan_result_2 <- dbscan(df_clustering_scaled, eps = eps_value_2, minPts = min_samples_2)
+calculate_wcss <- function(data, max_k) {
+  wcss <- numeric(max_k)
+  
+  for (kc in 2:max_k) {
+    model <- ml_bisecting_kmeans(data, ~Blurred_Longitude + Blurred_Latitude, k = kc, max_iter = 10)
+    wcss[kc] <- sum(model$cost)
+  }
+  
+  return(wcss)
+}
 
-df_clustering$cluster_scenario_2 <- factor(dbscan_result_2$cluster)
-```
+max_k <- 20
+wcss_values <- calculate_wcss(dataset.clustering, max_k)
 
-##### Sumiranje rezultata dva scenarija
+wcss_df <- data.frame(
+  k = 1:max_k,
+  WCSS = wcss_values
+)
 
-``` {r}
-# Scenario 1
-cluster_summary_1 <- df_clustering %>%
-  group_by(cluster_scenario_1) %>%
-  summarize(count = n(),
-            avg_longitude = mean(Blurred_Longitude),
-            avg_latitude = mean(Blurred_Latitude),
-            avg_response_time = mean(Response_Time),
-            avg_priority = mean(Priority),
-            avg_call_type = mean(Call_Type))
-
-# Scenario 2
-cluster_summary_2 <- df_clustering %>%
-  group_by(cluster_scenario_2) %>%
-  summarize(count = n(),
-            avg_longitude = mean(Blurred_Longitude),
-            avg_latitude = mean(Blurred_Latitude),
-            avg_response_time = mean(Response_Time),
-            avg_priority = mean(Priority),
-            avg_call_type = mean(Call_Type))
-```
-
-##### Vizualizacija odnosa obelezja i pripadnosti klasterima
-
-``` {r Scenario 1 - Vizualizacija}
-ggplot(data, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = as.factor(Cluster))) +
-  geom_point(alpha = 0.6) +
-  labs(title = "Lon/Lat and Cluster dependency",
-       x = "Blurred Longitude",
-       y = "Blurred Latitude",
-       color = "Cluster") +
-  theme_minimal()
-```
-
-``` {r Scenario 2 - Vizualizacija}
-ggplot(df_clustering, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = cluster_scenario_2)) +
-  geom_point(alpha = 0.6) +
-  labs(title = "DBSCAN Clustering (Scenario 2) based on Precinct, Longitude, and Latitude",
-       x = "Blurred Longitude",
-       y = "Blurred Latitude",
-       color = "Cluster") +
+ggplot(wcss_df, aes(x = k, y = WCSS)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Lakat metoda za određivanje optimalnog broja klastera",
+       x = "Broj klastera (k)",
+       y = "Within-Cluster Sum of Squares (WCSS)") +
   theme_minimal() +
-  theme(legend.position = "bottom")
+  theme(text = element_text(size = 16))
+```
+- Može se primetiti za k = 7 i k = 10 dolazi do značajnih padova na lakat dijagramu, stoga su ove vrednosti odabrane za brojeve klastera. 
+
+### Kreiranje klasterizacionih modela
+
+```{r}
+
+model.k7 <- ml_bisecting_kmeans(dataset.clustering, ~Blurred_Longitude + Blurred_Latitude, k = 7, seed = 1, max_iter = 10)
+clusters.k7 <- ml_predict(model.k7, dataset.clustering)
+
+model.k10 <- ml_bisecting_kmeans(dataset.clustering, ~Blurred_Longitude + Blurred_Latitude, k = 10, seed = 1, max_iter = 10)
+clusters.k10 <- ml_predict(model.k10, dataset.clustering)
+```
+
+### Ispitivanje strukture klastera
+
+-   Pod ispitivanjem strukture klastera spada nekoliko parametara čije
+    se vrednosti pokazuju, a to su:
+    1.  Centroida klastera
+    2.  Veličina i gustina klastera - Odnosi se na broj pojava unutar
+        klastera i koliko su one "spakovane" unutar njega.
+    3.  Varijansa klastera (Raširenost) - Predstavlja disperziju
+        vrednosti unutar klastera. Niska varijansa označava da su
+        vrednosti unutar klastera smeštene oko centroide.
+    4.  Međuklasterska udaljenost - Predstavlja distancu između
+        centroida dva klastera
+    5.  Unutarklasterska sličnost -> Označava koliko su vrednosti
+        unutar klastera bliske jedna drugoj
+
+##### Struktura klastera za k = 7
+
+```{r}
+variance_within_clusters <- function(data) {
+  data %>%
+    group_by(prediction) %>%
+    summarise(across(c(Blurred_Longitude, Blurred_Latitude), var))
+}
+
+cluster_summary <- function(data) {
+  data %>%
+    group_by(prediction) %>%
+    summarise(across(c(Blurred_Longitude, Blurred_Latitude), list(mean = mean, sd = sd, median = median)))
+}
+
+centers.k7 <- model.k7$centers
+sizes.k7 <- table(dplyr::pull(clusters.k7, prediction))
+variance.k7 <- variance_within_clusters(clusters.k7)
+summary.k7 <- cluster_summary(clusters.k7)
+
+print(centers.k7)
+print(sizes.k7)
+print(variance.k7)
+print(summary.k7)
+```
+
+##### Struktura klastera za k = 10
+
+```{r}
+centers.k10 <- model.k10$centers
+sizes.k10 <- table(dplyr::pull(clusters.k10, prediction))
+variance.k10 <- variance_within_clusters(clusters.k10)
+summary.k10 <- cluster_summary(clusters.k10)
+
+print(centers.k10)
+print(sizes.k10)
+print(variance.k10)
+print(summary.k10)
+```
+
+### Vizualizacija klastera
+
+```{r}
+plot_clusters <- function(data, centers, title) {
+  ggplot(data, aes(x = Blurred_Longitude, y = Blurred_Latitude, color = as.factor(prediction))) +
+    geom_point(size = 2) +
+    geom_point(data = centers, aes(x = Blurred_Longitude, y = Blurred_Latitude), color = "black", size = 3, shape = 4) +
+    labs(color = "Klaster", title = title, x = "Geografska dužina", y = "Geografska širina") +
+    theme_minimal() +
+    theme(text = element_text(size = 16))
+}
+
+
+sample_data.k7 <- clusters.k7 %>% sample_frac(0.01)
+sample_data.k10 <- clusters.k10 %>% sample_frac(0.01)
+heatmap3 <- plot_clusters(collect(sample_data.k7), centers.k7, "Density Heatmap for K=7")
+heatmap4 <- plot_clusters(collect(sample_data.k10), centers.k10, "Density Heatmap for K=10")
+
+ggsave("heatmap3.jpg", heatmap3)
+ggsave("heatmap4.jpg", heatmap4)
+
+include_graphics(c("heatmap3.jpg", "heatmap4.jpg"))
+```
+### Prikazivanje odnosa izmedju vrednosti pojedinačnih obeležja i klastera 
+
+##### Veza izmedju Finalne kategorije incidenta i klastera za k = 7
+``` {r}
+ggplot(data = collect(sample_data.k7), aes(x = as.factor(prediction))) +
+  geom_bar(aes(fill = Final_Category), position = "fill") +
+  labs(x = "Klaster", y = "Proporcija", title = "Raspodela Finalnih kategorija unutar klastera") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  theme(text = element_text(size = 16))
+```
+- Može se primetiti da za različite delove grada Sijetla (predstavljene klasterima), dolazi do ravnomerne zastupljenosti incidenata.  
+
+##### Veza izmedju Policijske uprave i klastera za k = 7
+
+``` {r}
+# Precinct and Cluster
+ggplot(data = collect(sample_data.k7), aes(x = as.factor(prediction))) +
+  geom_bar(aes(fill = Precinct), position = "fill") +
+  labs(x = "Klaster", y = "Proporcija", title = "Raspodela Policijskih uprava unutar klastera") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  theme(text = element_text(size = 16))
+```
+- Analizom ove raspodele može se utvrditi da za određene delove grada su zadužene određene policijske uprave, što je i logično.
+
+##### Veza izmedju Finalne kategorije incidenta i klastera za k = 10
+``` {r}
+ggplot(data = collect(sample_data.k10), aes(x = as.factor(prediction))) +
+  geom_bar(aes(fill = Final_Category), position = "fill") +
+  labs(x = "Klaster", y = "Proporcija", title = "Raspodela Finalnih kategorija unutar klastera") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  theme(text = element_text(size = 16))
+```
+- Primećuje se da ne postoji veza između određenih delova grada i inicidenata koji se dešavaju.
+
+##### Veza izmedju Policijske uprave i klastera za k = 10
+
+``` {r}
+# Precinct and Cluster
+ggplot(data = collect(sample_data.k10), aes(x = as.factor(prediction))) +
+  geom_bar(aes(fill = Precinct), position = "fill") +
+  labs(x = "Klaster", y = "Proporcija", title = "Raspodela Policijskih uprava unutar klastera") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  theme(text = element_text(size = 16))
 ```
